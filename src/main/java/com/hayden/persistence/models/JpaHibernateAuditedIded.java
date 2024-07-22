@@ -2,6 +2,7 @@ package com.hayden.persistence.models;
 
 
 import com.hayden.persistence.generator.TsidGenerator;
+import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.MappedSuperclass;
 import lombok.AllArgsConstructor;
@@ -21,6 +22,7 @@ public class JpaHibernateAuditedIded extends Audited implements EqualsAndHashCod
     @jakarta.persistence.Id
     @GenericGenerator(name = "jpa_id_seq", type = TsidGenerator.class)
     @GeneratedValue(generator = "jpa_id_seq")
+    @Column(name = "uuid")
     protected Long uuid;
 
     @Override

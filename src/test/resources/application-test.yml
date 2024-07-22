@@ -4,3 +4,8 @@ spring:
     username: sa
     password:
     driverClassName: org.h2.Driver
+  jpa:
+    show-sql: true
+    generate-ddl: true
+    hibernate:
+      ddl-auto: create-drop
