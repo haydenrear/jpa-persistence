@@ -16,7 +16,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
-import java.sql.JDBCType;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
