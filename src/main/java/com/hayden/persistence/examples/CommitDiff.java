@@ -13,8 +13,8 @@ import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 
-@Entity
-@Table
+//@Entity
+//@Table
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
