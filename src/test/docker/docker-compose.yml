@@ -1,0 +1,13 @@
+services:
+  cdc-subscriber-test-pg:
+    image: localhost:5001/postgres-pgvector
+    container_name: cdc-subscriber-test-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - cdc-subscriber-test:/var/lib/postgresql/embedding
+    ports:
+      - "5489:5432"
+volumes:
+  cdc-subscriber-test:

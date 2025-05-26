@@ -1,0 +1,26 @@
+spring:
+  docker:
+    compose:
+      enabled: true
+      file: src/test/docker/docker-compose.yml
+      lifecycle-management: start_only
+      readiness:
+        wait: always
+      skip:
+        in-tests: false
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    jdbc-url: jdbc:postgresql://localhost:5489/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
+    url: jdbc:postgresql://localhost:5489/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+      format_sql: true
+    show-sql: false
+  liquibase:
+    enabled: false
+  cloud:
+    zookeeper:
+      enabled: false
