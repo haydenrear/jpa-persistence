@@ -51,13 +51,12 @@ public class CdcProcessor {
             log.info(
                     "Registered CDC subscriber for subscription: {}",
                     subscriptionName);
-
-
         }
 
         executor.initialize();
 
-        var e = Executors.newScheduledThreadPool(5);
+        var e = Executors.newScheduledThreadPool(1);
+
         e.scheduleAtFixedRate(() -> {
             executor.notifications()
                     .peekError(err -> {

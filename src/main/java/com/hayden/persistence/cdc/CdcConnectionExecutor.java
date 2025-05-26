@@ -4,7 +4,6 @@ import com.hayden.utilitymodule.result.ManyResult;
 import com.hayden.utilitymodule.result.Result;
 import com.hayden.utilitymodule.result.agg.AggregateError;
 import com.hayden.utilitymodule.result.error.SingleError;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.postgresql.PGConnection;
@@ -12,7 +11,6 @@ import org.postgresql.PGNotification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -39,7 +37,12 @@ public class CdcConnectionExecutor {
     private Connection conn;
 
     public Result<Boolean, AggregateError.StdAggregateError> initialize() {
-        return refreshConnection();
+        var i = refreshConnection();
+
+        if (i.isError())
+            throw new RuntimeException("Failed to initialize with err %s".formatted(i.errorMessage()));
+
+        return i;
     }
 
     private @NotNull Result<Boolean, AggregateError.StdAggregateError> refreshConnection() {
