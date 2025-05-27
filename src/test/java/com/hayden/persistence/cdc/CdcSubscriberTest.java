@@ -1,7 +1,7 @@
 package com.hayden.persistence.cdc;
 
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.BeforeAll;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.postgresql.PGConnection;
@@ -20,6 +20,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -52,40 +53,31 @@ class CdcSubscriberTest {
             }
 
             @Override
-            public String getSubscriptionName() {
-                return "test_subscription";
+            public List<String> getSubscriptionName() {
+                return List.of("test_subscription");
+            }
+
+            @Override
+            public Optional<String> createSubscription() {
+                @Language("sql") String toExec = """
+                        CREATE TABLE IF NOT EXISTS my_table (hello bigint, goodbye varchar(9999));
+                        INSERT INTO my_table VALUES (1, 'test');
+                        CREATE OR REPLACE FUNCTION notify_trigger() RETURNS trigger AS
+                        $$
+                        BEGIN
+                        PERFORM pg_notify('test_subscription', row_to_json(NEW)::text);
+                        RETURN NEW;
+                        END;
+                        $$ LANGUAGE plpgsql;
+                        CREATE OR REPLACE TRIGGER my_trigger
+                        AFTER INSERT OR UPDATE
+                        ON my_table
+                        FOR EACH ROW
+                        EXECUTE FUNCTION notify_trigger();
+                        """;
+                return Optional.of(toExec);
             }
         }
-    }
-
-
-
-    @SneakyThrows
-    @BeforeAll
-    public static void beforeAnything() {
-        Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5489/postgres", "postgres", "postgres");
-        PGConnection pgConn = conn.unwrap(org.postgresql.PGConnection.class);
-        Statement stmt = conn.createStatement();
-        stmt.execute("""
-                CREATE TABLE IF NOT EXISTS my_table (hello bigint, goodbye varchar(9999));
-                INSERT INTO my_table VALUES (1, 'test');
-                """);
-        String subscription = """
-                CREATE OR REPLACE FUNCTION notify_trigger() RETURNS trigger AS
-                $$
-                BEGIN
-                PERFORM pg_notify('test_subscription', row_to_json(NEW)::text);
-                RETURN NEW;
-                END;
-                $$ LANGUAGE plpgsql;
-                CREATE OR REPLACE TRIGGER my_trigger
-                AFTER INSERT OR UPDATE
-                ON my_table
-                FOR EACH ROW
-                EXECUTE FUNCTION notify_trigger();
-                """;
-
-        stmt.execute(subscription);
     }
 
     @Autowired
@@ -107,5 +99,6 @@ class CdcSubscriberTest {
 
         assertThat(ref.get().size()).isEqualTo(1);
     }
+
 
 }

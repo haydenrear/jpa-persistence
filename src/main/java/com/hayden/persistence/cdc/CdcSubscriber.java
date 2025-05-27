@@ -1,6 +1,8 @@
 package com.hayden.persistence.cdc;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Interface for CDC subscribers that process database change events
@@ -19,10 +21,14 @@ public interface CdcSubscriber {
         Map<String, Object> data
     );
 
+    default Optional<String> createSubscription() {
+        return Optional.empty();
+    }
+
     /**
      * Get the subscription name this subscriber is interested in
      *
      * @return The subscription name
      */
-    String getSubscriptionName();
+    List<String> getSubscriptionName();
 }

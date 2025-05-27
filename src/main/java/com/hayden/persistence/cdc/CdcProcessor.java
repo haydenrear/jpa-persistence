@@ -1,6 +1,7 @@
 package com.hayden.persistence.cdc;
 
 import com.google.common.collect.Lists;
+import com.hayden.utilitymodule.result.agg.AggregateParamError;
 import com.hayden.utilitymodule.stream.StreamUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -41,19 +42,26 @@ public class CdcProcessor {
 
         // Organize subscribers by subscription name
         for (CdcSubscriber subscriber : subscribers) {
-            String subscriptionName = subscriber.getSubscriptionName();
-            subscriptionMap.compute(subscriptionName, (key, prev) -> Optional.ofNullable(prev)
-                    .map(c -> {
-                        c.add(subscriber);
-                        return c;
-                    })
-                    .orElseGet(() -> Lists.newArrayList(subscriber)));
-            log.info(
-                    "Registered CDC subscriber for subscription: {}",
-                    subscriptionName);
+            var subscriptionNames = subscriber.getSubscriptionName();
+            subscriptionNames.forEach(subscriptionName -> {
+                subscriptionMap.compute(subscriptionName, (key, prev) -> Optional.ofNullable(prev)
+                        .map(c -> {
+                            c.add(subscriber);
+                            return c;
+                        })
+                        .orElseGet(() -> Lists.newArrayList(subscriber)));
+                log.info(
+                        "Registered CDC subscriber for subscription: {}",
+                        subscriptionName);
+            });
+
         }
 
-        executor.initialize();
+        executor.initialize()
+                .filterErr(AggregateParamError::isError)
+                .doOnError(sa -> {
+                    log.error("Error initializing CDC subscribers: {}", sa.getMessage());
+                });
 
         var e = Executors.newScheduledThreadPool(1);
 
@@ -69,14 +77,15 @@ public class CdcProcessor {
                                 log.error("Received subscription for {} - but did not own subscriber.", key);
                                 return null;
                             }
-                            prev.forEach(s -> {
-                                if (!Objects.equals(notification.getName(), s.getSubscriptionName())) {
-                                    log.error("Subscriber for notification {} did not match {}", s.getSubscriptionName(), notification.getName());
-                                } else {
-                                    s.onDataChange(s.getSubscriptionName(), s.getSubscriptionName(),
-                                            Map.of(notification.getName(), notification.getParameter()));
-                                }
-                            });
+                            prev.forEach(s -> s.getSubscriptionName()
+                                    .forEach(subscriptionName -> {
+                                        if (!Objects.equals(notification.getName(), subscriptionName)) {
+                                            log.error("Subscriber for notification {} did not match {}", subscriptionName, notification.getName());
+                                        } else {
+                                            s.onDataChange(subscriptionName, subscriptionName,
+                                                    Map.of(notification.getName(), notification.getParameter()));
+                                        }
+                                    }));
                             return prev;
                         });
                     });

@@ -4,6 +4,7 @@ import com.hayden.utilitymodule.result.ManyResult;
 import com.hayden.utilitymodule.result.Result;
 import com.hayden.utilitymodule.result.agg.AggregateError;
 import com.hayden.utilitymodule.result.error.SingleError;
+import com.hayden.utilitymodule.stream.StreamUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.postgresql.PGConnection;
@@ -28,21 +29,32 @@ public class CdcConnectionExecutor {
     @Autowired(required = false)
     private List<CdcSubscriber> subscribers = new ArrayList<>();
 
-    @Value("${spring.datasource.password:postgres}")
+    @Value("${spring.datasource.cdc-subscriber.password:postgres}")
     String databasePassword;
-    @Value("${spring.datasource.username:postgres}")
+    @Value("${spring.datasource.cdc-subscriber.username:postgres}")
     String databaseUsername;
+
 
     private PGConnection pgConn;
     private Connection conn;
 
     public Result<Boolean, AggregateError.StdAggregateError> initialize() {
-        var i = refreshConnection();
 
-        if (i.isError())
-            throw new RuntimeException("Failed to initialize with err %s".formatted(i.errorMessage()));
+        var found = Result.<CdcSubscriber, SingleError>stream(subscribers.stream())
+                .flatMapResult(c -> Result.fromOpt(c.createSubscription()))
+                .flatMapResult(this::executeDdl)
+                .filterErr(SingleError::isError)
+                .toList();
 
-        return i;
+        var toRefresh = refreshConnection();
+
+        if (toRefresh.isError())
+            throw new RuntimeException("Failed to initialize with err %s".formatted(toRefresh.errorMessage()));
+        else if (!found.errsList().isEmpty()) {
+            return Result.from(true, new AggregateError.StandardAggregateError(new HashSet<>(found.errsList())));
+        }
+
+        return toRefresh;
     }
 
     private @NotNull Result<Boolean, AggregateError.StdAggregateError> refreshConnection() {
@@ -59,10 +71,12 @@ public class CdcConnectionExecutor {
             pgConn = conn.unwrap(PGConnection.class);
 
             for (var subscriber : this.subscribers) {
-                try {
-                    stmt.execute("LISTEN " + subscriber.getSubscriptionName());
-                } catch (SQLException e) {
-                    errors.add(SingleError.fromE(e, "Failed to load subscriber %s".formatted(subscriber)));
+                for (var sName : subscriber.getSubscriptionName()) {
+                    try {
+                        stmt.execute("LISTEN " + sName);
+                    } catch (SQLException e) {
+                        errors.add(SingleError.fromE(e, "Failed to load subscriber %s".formatted(subscriber)));
+                    }
                 }
             }
         } catch (SQLException pExc) {
@@ -74,6 +88,18 @@ public class CdcConnectionExecutor {
         } else {
             return Result.from(true, new AggregateError.StandardAggregateError(errors));
         }
+    }
+
+    public Result<Boolean, SingleError> executeDdl(String toExec) {
+        return Result.<DataSource, SingleError>fromOpt(Optional.ofNullable(dataSource))
+                .flatMapResult(ds -> {
+                    try {
+                        ds.getConnection().createStatement().execute(toExec);
+                        return Result.ok(true);
+                    } catch (Exception e) {
+                        return Result.err(SingleError.fromE(e, "Failed to execute DDL %s".formatted(toExec)));
+                    }
+                });
     }
 
     public ManyResult<PGNotification, SingleError> notifications() {
