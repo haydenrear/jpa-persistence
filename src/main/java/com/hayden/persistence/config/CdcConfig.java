@@ -28,7 +28,7 @@ import javax.sql.DataSource;
 public class CdcConfig {
 
     @Bean
-    @ConfigurationProperties("spring.datasource.cdc-subscriber")
+    @ConfigurationProperties(prefix = "spring.datasource.cdc-subscriber")
     public DataSource cdcDataSource() {
         return DataSourceBuilder.create().build();
     }
