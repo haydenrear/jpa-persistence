@@ -25,12 +25,12 @@ import java.util.*;
 public class CdcConnectionExecutor {
 
     @Autowired(required = false)
-    private DataSource dataSource;
-    @Autowired(required = false)
     private List<CdcSubscriber> subscribers = new ArrayList<>();
 
     @Value("${spring.datasource.cdc-subscriber.password:postgres}")
     String databasePassword;
+    @Value("${spring.datasource.cdc-subscriber.url}")
+    String url;
     @Value("${spring.datasource.cdc-subscriber.username:postgres}")
     String databaseUsername;
 
@@ -60,12 +60,11 @@ public class CdcConnectionExecutor {
     private @NotNull Result<Boolean, AggregateError.StdAggregateError> refreshConnection() {
         Set<SingleError> errors = new HashSet<>();
 
-        if (subscribers.isEmpty() || dataSource == null) {
+        if (subscribers.isEmpty()) {
             return Result.ok(true);
         }
 
         try {
-            String url = dataSource.getConnection().getMetaData().getURL();
             conn = DriverManager.getConnection(url, databaseUsername, databasePassword);
             Statement stmt = conn.createStatement();
             pgConn = conn.unwrap(PGConnection.class);
@@ -91,15 +90,14 @@ public class CdcConnectionExecutor {
     }
 
     public Result<Boolean, SingleError> executeDdl(String toExec) {
-        return Result.<DataSource, SingleError>fromOpt(Optional.ofNullable(dataSource))
-                .flatMapResult(ds -> {
-                    try {
-                        ds.getConnection().createStatement().execute(toExec);
-                        return Result.ok(true);
-                    } catch (Exception e) {
-                        return Result.err(SingleError.fromE(e, "Failed to execute DDL %s".formatted(toExec)));
-                    }
-                });
+        try {
+            var conn = DriverManager.getConnection(url, databaseUsername, databasePassword);
+            Statement stmt = conn.createStatement();
+            stmt.execute(toExec);
+            return Result.ok(true);
+        } catch (Exception e) {
+            return Result.err(SingleError.fromE(e, "Failed to execute DDL %s".formatted(toExec)));
+        }
     }
 
     public ManyResult<PGNotification, SingleError> notifications() {
@@ -132,6 +130,9 @@ public class CdcConnectionExecutor {
 
     private ManyResult<PGNotification, SingleError> getNotificationStream() throws SQLException {
         return Result.<PGNotification, SingleError>stream(Arrays.stream(this.pgConn.getNotifications()))
+                .peek(pg -> {
+                    log.debug(pg.toString());
+                })
                 .many();
     }
 

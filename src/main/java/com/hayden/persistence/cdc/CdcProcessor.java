@@ -1,6 +1,7 @@
 package com.hayden.persistence.cdc;
 
 import com.google.common.collect.Lists;
+import com.hayden.utilitymodule.db.DbDataSourceTrigger;
 import com.hayden.utilitymodule.result.agg.AggregateParamError;
 import com.hayden.utilitymodule.stream.StreamUtil;
 import jakarta.annotation.PostConstruct;
@@ -23,9 +24,12 @@ public class CdcProcessor {
 
     @Autowired(required = false)
     private List<CdcSubscriber> subscribers = new ArrayList<>();
-
     @Autowired
     private CdcConnectionExecutor executor;
+    @Autowired
+    private DbDataSourceTrigger dbTrigger;
+
+
 
 
     // Map of subscription name to list of subscribers
@@ -66,29 +70,26 @@ public class CdcProcessor {
         var e = Executors.newScheduledThreadPool(1);
 
         e.scheduleAtFixedRate(() -> {
-            executor.notifications()
-                    .peekError(err -> {
-                        if (err.isError())
-                            log.error(err.getMessage());
-                    })
-                    .doOnEach(notification -> {
-                        subscriptionMap.compute(notification.getName(), (key, prev) -> {
-                            if (prev == null) {
-                                log.error("Received subscription for {} - but did not own subscriber.", key);
-                                return null;
-                            }
-                            prev.forEach(s -> s.getSubscriptionName()
-                                    .forEach(subscriptionName -> {
-                                        if (!Objects.equals(notification.getName(), subscriptionName)) {
-                                            log.error("Subscriber for notification {} did not match {}", subscriptionName, notification.getName());
-                                        } else {
-                                            s.onDataChange(subscriptionName, subscriptionName,
-                                                    Map.of(notification.getName(), notification.getParameter()));
-                                        }
-                                    }));
-                            return prev;
+            dbTrigger.doWithKey(sKey -> {
+                sKey.setKey("cdc-subscriber");
+                executor.notifications()
+                        .peekError(err -> {
+                            if (err.isError())
+                                log.error(err.getMessage());
+                        })
+                        .doOnEach(notification -> {
+                            subscriptionMap.compute(notification.getName(), (key, prev) -> {
+                                if (prev == null) {
+                                    log.error("Received subscription for {} - but did not own subscriber.", key);
+                                    return null;
+                                }
+                                prev.forEach(s -> s.getSubscriptionName()
+                                        .forEach(subscriptionName -> s.onDataChange(subscriptionName, subscriptionName,
+                                                Map.of(notification.getName(), notification.getParameter()))));
+                                return prev;
+                            });
                         });
-                    });
+            });
 
 
         }, 1, 1, TimeUnit.SECONDS);
