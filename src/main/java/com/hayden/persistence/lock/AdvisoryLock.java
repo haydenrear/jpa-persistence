@@ -35,6 +35,10 @@ public class AdvisoryLock {
         jdbcTemplate.execute(LOCK_SQL.formatted(sessionId));
     }
 
+    public void doUnlock(String sessionId) {
+        jdbcTemplate.execute(UNLOCK_SQL.formatted(sessionId));
+    }
+
     public void doLock(String sessionId, String key) {
         if (trigger != null) {
             trigger.doWithKey(sKey -> {
@@ -57,11 +61,6 @@ public class AdvisoryLock {
         }
     }
 
-    public void doUnlock(String sessionId) {
-        jdbcTemplate.execute(UNLOCK_SQL.formatted(sessionId));
-    }
-
-
     public void printAdvisoryLocks(String key) {
         if (trigger == null || key == null) {
             printAdvisoryLocks();
@@ -76,7 +75,8 @@ public class AdvisoryLock {
     public void printAdvisoryLocks() {
         var found = jdbcTemplate.query("""
             SELECT * FROM pg_locks WHERE locktype = 'advisory';
-            """, (rs, rowNum) -> rs.getString("objid"));
+            """,
+                (rs, rowNum) -> rs.getString("objid"));
 
         found.stream().filter(Objects::nonNull)
                 .forEach(next -> log.info("Found next column advisory lock. {}", next));
