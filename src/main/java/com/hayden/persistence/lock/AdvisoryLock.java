@@ -38,37 +38,14 @@ public class AdvisoryLock {
                 SELECT pg_advisory_unlock(hashtext('%s'));
             """;
 
+    public record DatabaseMetadata(String username, String password, String jdbcUrl) {}
+
     @Autowired
     JdbcTemplate jdbcTemplate;
 
     @Autowired(required = false)
     DbDataSourceTrigger trigger;
 
-    public record DatabaseMetadata(String username, String password, String jdbcUrl) {}
-
-    public Connection newIsolatedConnection(DataSource ds) throws SQLException {
-        Optional<DatabaseMetadata> databaseMetadata = retrieveMetadata(ds);
-        if (databaseMetadata.isEmpty()) {
-            throw new SQLException("Could not load database metadata");
-        }
-        return newIsolatedConnection(databaseMetadata.get());
-    }
-
-    public Connection newIsolatedConnection(DatabaseMetadata metadata) throws SQLException {
-        return DriverManager.getConnection(metadata.jdbcUrl, metadata.username, metadata.password);
-    }
-
-    public Optional<DatabaseMetadata> retrieveMetadata(DataSource dataSource) {
-        if (dataSource instanceof AbstractRoutingDataSource a) {
-            String key = trigger.currentKey();
-            dataSource = a.getResolvedDataSources().get(key);
-        }
-        if (dataSource instanceof HikariDataSource h) {
-            return Optional.of(new DatabaseMetadata(h.getUsername(), h.getPassword(), h.getJdbcUrl()));
-        }
-
-        return Optional.empty();
-    }
 
     public <T> T doWithAdvisoryLock(Callable<T> toDo, String sessionId) {
 
@@ -109,6 +86,30 @@ public class AdvisoryLock {
                 return doWithAdvisoryLock(toDo, sessionId);
             });
         }
+    }
+
+    public Connection newIsolatedConnection(DataSource ds) throws SQLException {
+        Optional<DatabaseMetadata> databaseMetadata = retrieveMetadata(ds);
+        if (databaseMetadata.isEmpty()) {
+            throw new SQLException("Could not load database metadata");
+        }
+        return newIsolatedConnection(databaseMetadata.get());
+    }
+
+    public Connection newIsolatedConnection(DatabaseMetadata metadata) throws SQLException {
+        return DriverManager.getConnection(metadata.jdbcUrl, metadata.username, metadata.password);
+    }
+
+    public Optional<DatabaseMetadata> retrieveMetadata(DataSource dataSource) {
+        if (dataSource instanceof AbstractRoutingDataSource a) {
+            String key = trigger.currentKey();
+            dataSource = a.getResolvedDataSources().get(key);
+        }
+        if (dataSource instanceof HikariDataSource h) {
+            return Optional.of(new DatabaseMetadata(h.getUsername(), h.getPassword(), h.getJdbcUrl()));
+        }
+
+        return Optional.empty();
     }
 
     private void doTryClose(String sessionId, JdbcTemplate jdbc) {
