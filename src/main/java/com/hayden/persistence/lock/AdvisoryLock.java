@@ -1,6 +1,5 @@
 package com.hayden.persistence.lock;
 
-import com.hayden.utilitymodule.MapFunctions;
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
 import lombok.extern.slf4j.Slf4j;
 import org.intellij.lang.annotations.Language;
@@ -8,11 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import java.sql.SQLException;
-import java.util.Map;
 import java.util.Objects;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @Slf4j
@@ -66,7 +63,7 @@ public class AdvisoryLock {
 
 
     public void printAdvisoryLocks(String key) {
-        if (trigger == null) {
+        if (trigger == null || key == null) {
             printAdvisoryLocks();
         } else {
             trigger.doWithKey(sKey -> {
@@ -85,4 +82,16 @@ public class AdvisoryLock {
                 .forEach(next -> log.info("Found next column advisory lock. {}", next));
     }
 
+    public void scheduleAdvisoryLockLogger() {
+        scheduleAdvisoryLockLogger(null);
+    }
+
+    public void scheduleAdvisoryLockLogger(String name) {
+        Executors.newScheduledThreadPool(1)
+                .scheduleAtFixedRate(
+                        () -> printAdvisoryLocks(name),
+                        1,
+                        30,
+                        TimeUnit.SECONDS);
+    }
 }
