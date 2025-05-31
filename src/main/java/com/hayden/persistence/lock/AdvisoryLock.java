@@ -1,9 +1,11 @@
 package com.hayden.persistence.lock;
 
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
+import jakarta.persistence.PersistenceException;
 import lombok.extern.slf4j.Slf4j;
 import org.intellij.lang.annotations.Language;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -93,5 +95,20 @@ public class AdvisoryLock {
                         1,
                         30,
                         TimeUnit.SECONDS);
+    }
+
+    public void doUnlockRecursive(String sessionDir, String key) {
+        try {
+            doUnlock(sessionDir, key);
+        } catch (DataAccessException |
+                 PersistenceException e) {
+            log.error("Failed to unlock session {} - will try again indefinitely.", sessionDir, e);
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ex) {
+                log.error("Error waiting to unlock session {}", sessionDir, ex);
+            }
+            doUnlockRecursive(sessionDir, key);
+        }
     }
 }
