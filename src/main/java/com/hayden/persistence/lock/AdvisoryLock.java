@@ -7,18 +7,19 @@ import org.intellij.lang.annotations.Language;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
+import java.sql.SQLException;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @Component
 @Slf4j
 public class AdvisoryLock {
-
-    @Autowired(required = false)
-    DbDataSourceTrigger trigger;
 
     @Language("sql")
     public static final String LOCK_SQL = """
@@ -33,34 +34,60 @@ public class AdvisoryLock {
     @Autowired
     JdbcTemplate jdbcTemplate;
 
-    public void doLock(String sessionId) {
-        jdbcTemplate.execute(LOCK_SQL.formatted(sessionId));
+    @Autowired(required = false)
+    DbDataSourceTrigger trigger;
+
+    public <T> T doWithAdvisoryLock(Callable<T> toDo, String sessionId) {
+        try {
+            DataSource dataSource = jdbcTemplate.getDataSource();
+            if (dataSource == null) {
+                log.error("Could not get data source");
+                return null;
+            }
+
+            try(var cxn = dataSource.getConnection();
+                var ds = new SingleConnectionDataSource(cxn, false)) {
+                JdbcTemplate jdbc = null;
+                try {
+                    jdbc = new JdbcTemplate(ds);
+                    doLock(sessionId, jdbc);
+                    var called = toDo.call();
+                    return called;
+                } catch (Exception e) {
+                    doTryClose(sessionId, jdbc);
+                } finally {
+                    doUnlock(sessionId, jdbc);
+                }
+            }
+        } catch (SQLException e) {
+            log.error(e.getMessage(), e);
+        }
+
+        return null;
     }
 
-    public void doUnlock(String sessionId) {
-        jdbcTemplate.execute(UNLOCK_SQL.formatted(sessionId));
-    }
-
-    public void doLock(String sessionId, String key) {
-        if (trigger != null) {
-            trigger.doWithKey(sKey -> {
-                sKey.setKey(key);
-                doLock(sessionId);
+    public <T> T doWithAdvisoryLock(Callable<T> toDo, String sessionId, String name) {
+        if (name == null || trigger == null)
+            return doWithAdvisoryLock(toDo, sessionId);
+        else {
+            return trigger.doOnKey(key -> {
+                key.setKey(name);
+                return doWithAdvisoryLock(toDo, sessionId);
             });
-        } else {
-            doLock(sessionId);
         }
     }
 
-    public void doUnlock(String sessionId, String key) {
-        if (trigger != null) {
-            trigger.doWithKey(sKey -> {
-                sKey.setKey(key);
-                doUnlock(sessionId);
-            });
-        } else {
-            doUnlock(sessionId);
-        }
+    private void doTryClose(String sessionId, JdbcTemplate jdbc) {
+        if (jdbc != null)
+            doUnlockRecursive(sessionId, jdbc);
+    }
+
+    public void doLock(String sessionId, JdbcTemplate template) {
+        template.execute(LOCK_SQL.formatted(sessionId));
+    }
+
+    public void doUnlock(String sessionId, JdbcTemplate template) {
+        template.execute(UNLOCK_SQL.formatted(sessionId));
     }
 
     public void printAdvisoryLocks(String key) {
@@ -97,9 +124,9 @@ public class AdvisoryLock {
                         TimeUnit.SECONDS);
     }
 
-    public void doUnlockRecursive(String sessionDir, String key) {
+    private void doUnlockRecursive(String sessionDir, JdbcTemplate jdbc) {
         try {
-            doUnlock(sessionDir, key);
+            doUnlock(sessionDir, jdbc);
         } catch (DataAccessException |
                  PersistenceException e) {
             log.error("Failed to unlock session {} - will try again indefinitely.", sessionDir, e);
@@ -108,7 +135,7 @@ public class AdvisoryLock {
             } catch (InterruptedException ex) {
                 log.error("Error waiting to unlock session {}", sessionDir, ex);
             }
-            doUnlockRecursive(sessionDir, key);
+            doUnlockRecursive(sessionDir, jdbc);
         }
     }
 }
