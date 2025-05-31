@@ -1,6 +1,7 @@
 package com.hayden.persistence.lock;
 
 import com.zaxxer.hikari.HikariDataSource;
+import org.postgresql.Driver;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
@@ -61,7 +62,7 @@ public class AdvisoryLock {
             dataSource = a.getResolvedDataSources().get(key);
         }
         if (dataSource instanceof HikariDataSource h) {
-            return Optional.of(new DatabaseMetadata(h.getJdbcUrl(), h.getUsername(), h.getPassword()));
+            return Optional.of(new DatabaseMetadata(h.getUsername(), h.getPassword(), h.getJdbcUrl()));
         }
 
         return Optional.empty();
