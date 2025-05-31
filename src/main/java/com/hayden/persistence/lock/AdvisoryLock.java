@@ -1,5 +1,7 @@
 package com.hayden.persistence.lock;
 
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
 import jakarta.persistence.PersistenceException;
@@ -12,8 +14,11 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -38,34 +43,60 @@ public class AdvisoryLock {
     @Autowired(required = false)
     DbDataSourceTrigger trigger;
 
+    public record DatabaseMetadata(String username, String password, String jdbcUrl) {}
+
+    public Connection newIsolatedConnection(DataSource ds) throws SQLException {
+        return newIsolatedConnection(
+                retrieveMetadata(ds)
+                        .orElseThrow(() -> new PersistenceException("Failed to create new isolated connection")));
+    }
+
+    public Connection newIsolatedConnection(DatabaseMetadata metadata) throws SQLException {
+        return DriverManager.getConnection(metadata.jdbcUrl, metadata.username, metadata.password);
+    }
+
+    public Optional<DatabaseMetadata> retrieveMetadata(DataSource dataSource) {
+        if (dataSource instanceof HikariDataSource h) {
+            return Optional.of(new DatabaseMetadata(h.getJdbcUrl(), h.getUsername(), h.getPassword()));
+        }
+
+        return Optional.empty();
+    }
+
     public <T> T doWithAdvisoryLock(Callable<T> toDo, String sessionId) {
-        try {
 
-            if (TransactionSynchronizationManager.isActualTransactionActive()) {
-                log.error("❗ Spring transaction is active! Using manual connection with advisory lock may lead to inconsistent behavior.");
-            }
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            log.error("❗ Spring transaction is active! Using manual connection with advisory lock may lead to inconsistent behavior.");
+        }
 
-            DataSource dataSource = jdbcTemplate.getDataSource();
-            if (dataSource == null) {
-                log.error("Could not get data source");
-                return null;
-            }
+        DataSource dataSource = jdbcTemplate.getDataSource();
 
-            try(var cxn = dataSource.getConnection();
-                var ds = new SingleConnectionDataSource(cxn, false)) {
-                JdbcTemplate jdbc = null;
-                try {
-                    jdbc = new JdbcTemplate(ds);
-                    doLock(sessionId, jdbc);
-                    var called = toDo.call();
-                    return called;
-                } catch (Exception e) {
-                    log.error(e.getMessage(), e);
-                } finally {
-                    doTryClose(sessionId, jdbc);
-                }
+        if (dataSource == null) {
+            log.error("Could not get data source");
+            return null;
+        }
+
+        if (dataSource instanceof AbstractRoutingDataSource a) {
+            String key = trigger.currentKey();
+            dataSource = a.getResolvedDataSources().get(key);
+        }
+
+        if (dataSource == null) {
+            log.error("Could not get data source");
+            return null;
+        }
+
+        try (var cxn = newIsolatedConnection(dataSource);
+             var ds = new SingleConnectionDataSource(cxn, false)) {
+            var jdbc = new JdbcTemplate(ds);
+            try {
+                doLock(sessionId, jdbc);
+                var called = toDo.call();
+                return called;
+            } finally {
+                doTryClose(sessionId, jdbc);
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
 
@@ -84,8 +115,7 @@ public class AdvisoryLock {
     }
 
     private void doTryClose(String sessionId, JdbcTemplate jdbc) {
-        if (jdbc != null)
-            doUnlockRecursive(sessionId, jdbc);
+        doUnlockRecursive(sessionId, jdbc);
     }
 
     public void doLock(String sessionId, JdbcTemplate template) {
@@ -131,15 +161,20 @@ public class AdvisoryLock {
     }
 
     private void doUnlockRecursive(String sessionDir, JdbcTemplate jdbc) {
+        int num = 0;
         while (true) {
             try {
                 doUnlock(sessionDir, jdbc);
                 break;
             } catch (DataAccessException | PersistenceException e) {
                 log.error("Failed to unlock session {} - retrying...", sessionDir, e);
+                if (num > 10)
+                    throw e;
+                num += 1;
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException ex) {
+                    log.warn("Unlock retry loop interrupted for session {}", sessionDir);
                     Thread.currentThread().interrupt();
                     break;
                 }
