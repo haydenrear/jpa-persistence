@@ -47,9 +47,11 @@ public class AdvisoryLock {
     public record DatabaseMetadata(String username, String password, String jdbcUrl) {}
 
     public Connection newIsolatedConnection(DataSource ds) throws SQLException {
-        return newIsolatedConnection(
-                retrieveMetadata(ds)
-                        .orElseThrow(() -> new PersistenceException("Failed to create new isolated connection")));
+        Optional<DatabaseMetadata> databaseMetadata = retrieveMetadata(ds);
+        if (databaseMetadata.isEmpty()) {
+            throw new SQLException("Could not load database metadata");
+        }
+        return newIsolatedConnection(databaseMetadata.get());
     }
 
     public Connection newIsolatedConnection(DatabaseMetadata metadata) throws SQLException {
