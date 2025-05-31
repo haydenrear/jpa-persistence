@@ -56,6 +56,10 @@ public class AdvisoryLock {
     }
 
     public Optional<DatabaseMetadata> retrieveMetadata(DataSource dataSource) {
+        if (dataSource instanceof AbstractRoutingDataSource a) {
+            String key = trigger.currentKey();
+            dataSource = a.getResolvedDataSources().get(key);
+        }
         if (dataSource instanceof HikariDataSource h) {
             return Optional.of(new DatabaseMetadata(h.getJdbcUrl(), h.getUsername(), h.getPassword()));
         }
@@ -70,16 +74,6 @@ public class AdvisoryLock {
         }
 
         DataSource dataSource = jdbcTemplate.getDataSource();
-
-        if (dataSource == null) {
-            log.error("Could not get data source");
-            return null;
-        }
-
-        if (dataSource instanceof AbstractRoutingDataSource a) {
-            String key = trigger.currentKey();
-            dataSource = a.getResolvedDataSources().get(key);
-        }
 
         if (dataSource == null) {
             log.error("Could not get data source");
