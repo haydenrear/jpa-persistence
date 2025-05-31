@@ -1,5 +1,6 @@
 package com.hayden.persistence.lock;
 
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
 import jakarta.persistence.PersistenceException;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,11 @@ public class AdvisoryLock {
 
     public <T> T doWithAdvisoryLock(Callable<T> toDo, String sessionId) {
         try {
+
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                log.error("❗ Spring transaction is active! Using manual connection with advisory lock may lead to inconsistent behavior.");
+            }
+
             DataSource dataSource = jdbcTemplate.getDataSource();
             if (dataSource == null) {
                 log.error("Could not get data source");
@@ -125,17 +131,19 @@ public class AdvisoryLock {
     }
 
     private void doUnlockRecursive(String sessionDir, JdbcTemplate jdbc) {
-        try {
-            doUnlock(sessionDir, jdbc);
-        } catch (DataAccessException |
-                 PersistenceException e) {
-            log.error("Failed to unlock session {} - will try again indefinitely.", sessionDir, e);
+        while (true) {
             try {
-                Thread.sleep(500);
-            } catch (InterruptedException ex) {
-                log.error("Error waiting to unlock session {}", sessionDir, ex);
+                doUnlock(sessionDir, jdbc);
+                break;
+            } catch (DataAccessException | PersistenceException e) {
+                log.error("Failed to unlock session {} - retrying...", sessionDir, e);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
-            doUnlockRecursive(sessionDir, jdbc);
         }
     }
 }
