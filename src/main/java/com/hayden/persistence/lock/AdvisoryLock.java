@@ -60,9 +60,9 @@ public class AdvisoryLock {
                     var called = toDo.call();
                     return called;
                 } catch (Exception e) {
-                    doTryClose(sessionId, jdbc);
+                    log.error(e.getMessage(), e);
                 } finally {
-                    doUnlock(sessionId, jdbc);
+                    doTryClose(sessionId, jdbc);
                 }
             }
         } catch (SQLException e) {
