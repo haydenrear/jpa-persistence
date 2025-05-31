@@ -1,12 +1,21 @@
 package com.hayden.persistence.lock;
 
+import com.hayden.utilitymodule.MapFunctions;
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
+import lombok.extern.slf4j.Slf4j;
 import org.intellij.lang.annotations.Language;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.sql.SQLException;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
 @Component
+@Slf4j
 public class AdvisoryLock {
 
     @Autowired(required = false)
@@ -26,26 +35,54 @@ public class AdvisoryLock {
     JdbcTemplate jdbcTemplate;
 
     public void doLock(String sessionId) {
+        jdbcTemplate.execute(LOCK_SQL.formatted(sessionId));
+    }
+
+    public void doLock(String sessionId, String key) {
         if (trigger != null) {
             trigger.doWithKey(sKey -> {
-                sKey.setKey("function-calling");
-                jdbcTemplate.execute(LOCK_SQL.formatted(sessionId));
+                sKey.setKey(key);
+                doLock(sessionId);
             });
         } else {
-            jdbcTemplate.execute(LOCK_SQL.formatted(sessionId));
+            doLock(sessionId);
+        }
+    }
+
+    public void doUnlock(String sessionId, String key) {
+        if (trigger != null) {
+            trigger.doWithKey(sKey -> {
+                sKey.setKey(key);
+                doUnlock(sessionId);
+            });
+        } else {
+            doUnlock(sessionId);
         }
     }
 
     public void doUnlock(String sessionId) {
-        if (trigger != null) {
-            trigger.doWithKey(sKey -> {
-                sKey.setKey("function-calling");
-                jdbcTemplate.execute(UNLOCK_SQL.formatted(sessionId));
-            });
+        jdbcTemplate.execute(UNLOCK_SQL.formatted(sessionId));
+    }
+
+
+    public void printAdvisoryLocks(String key) {
+        if (trigger == null) {
+            printAdvisoryLocks();
         } else {
-            jdbcTemplate.execute(UNLOCK_SQL.formatted(sessionId));
+            trigger.doWithKey(sKey -> {
+                sKey.setKey(key);
+                printAdvisoryLocks();
+            });
         }
     }
 
+    public void printAdvisoryLocks() {
+        var found = jdbcTemplate.query("""
+            SELECT * FROM pg_locks WHERE locktype = 'advisory';
+            """, (rs, rowNum) -> rs.getString("objid"));
+
+        found.stream().filter(Objects::nonNull)
+                .forEach(next -> log.info("Found next column advisory lock. {}", next));
+    }
 
 }
