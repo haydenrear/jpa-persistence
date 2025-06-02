@@ -67,7 +67,7 @@ public class CdcProcessor {
                     log.error("Error initializing CDC subscribers: {}", sa.getMessage());
                 });
 
-        var e = Executors.newScheduledThreadPool(1);
+        var e = Executors.newScheduledThreadPool(5);
 
         e.scheduleAtFixedRate(() -> {
             dbTrigger.doWithKey(sKey -> {

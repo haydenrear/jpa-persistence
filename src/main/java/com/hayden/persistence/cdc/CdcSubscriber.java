@@ -31,4 +31,9 @@ public interface CdcSubscriber {
      * @return The subscription name
      */
     List<String> getSubscriptionName();
+
+    default String dbKey() {
+        return "cdc-subscriber";
+    }
+
 }
