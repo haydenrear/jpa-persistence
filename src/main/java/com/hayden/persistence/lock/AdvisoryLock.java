@@ -71,10 +71,10 @@ public class AdvisoryLock {
                 doTryClose(sessionId, jdbc);
             }
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
+            log.error("Failed to do with advisory lock: {}", e.getMessage());
+            throw new RuntimeException(e);
         }
 
-        return null;
     }
 
     public <T> T doWithAdvisoryLock(Callable<T> toDo, String sessionId, String name) {
