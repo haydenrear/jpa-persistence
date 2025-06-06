@@ -96,6 +96,13 @@ public class AdvisoryLock {
         return newIsolatedConnection(databaseMetadata.get());
     }
 
+    /**
+     * Need to use an isolated connection because the advisory lock is dropped when the session is closed.
+     * In the case where a connection pool recycles the connection, then the lock would be dropped.
+     * @param metadata
+     * @return
+     * @throws SQLException
+     */
     public Connection newIsolatedConnection(DatabaseMetadata metadata) throws SQLException {
         return DriverManager.getConnection(metadata.jdbcUrl, metadata.username, metadata.password);
     }
