@@ -1,6 +1,7 @@
 package com.hayden.persistence.models;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
@@ -23,21 +24,25 @@ public class Audited {
     @Column(name = "created_time")
     @CreatedDate
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
     private LocalDateTime createdTime;
 
     @Column(name = "updated_time")
     @LastModifiedDate
+    @JsonIgnore
     @EqualsAndHashCode.Exclude
     private LocalDateTime updatedTime;
 
     @Column(name = "created_by")
     @CreatedBy
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
     private String createdBy;
 
     @Column(name = "modified_by")
     @LastModifiedBy
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
     private String updatedBy;
 
 }
