@@ -34,7 +34,7 @@ public class LimitAccessAspect {
                         .map(DbDataSourceTrigger::currentKey)
                         .orElse("SINGLE"),
                 (key, prev) -> Optional.ofNullable(prev)
-                        .orElse(new Semaphore(32)));
+                        .orElse(new Semaphore(170)));
     }
 
     @Around("@annotation(limited)")
