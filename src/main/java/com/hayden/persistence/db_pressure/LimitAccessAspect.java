@@ -28,6 +28,8 @@ public class LimitAccessAspect {
 
     @Autowired(required = false)
     DbDataSourceTrigger trigger;
+    @Autowired(required = false)
+    LimitAccessConfigProperties limitAccessConfigProperties = new  LimitAccessConfigProperties();
 
     // 6:15
     public Semaphore retrieveSemaphore() {
@@ -36,7 +38,7 @@ public class LimitAccessAspect {
                         .map(DbDataSourceTrigger::currentKey)
                         .orElse("SINGLE"),
                 (key, prev) -> Optional.ofNullable(prev)
-                        .orElse(new Semaphore(170)));
+                        .orElse(new Semaphore(limitAccessConfigProperties.getMaxAccess())));
     }
 
     @Around("@annotation(limited)")
