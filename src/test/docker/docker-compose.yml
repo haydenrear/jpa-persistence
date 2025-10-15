@@ -1,6 +1,6 @@
 services:
   cdc-subscriber-test-pg:
-    image: localhost:5001/postgres-pgvector
+    image: localhost:5005/postgres-pgvector
     container_name: cdc-subscriber-test-pg
     environment:
       POSTGRES_USER: postgres
