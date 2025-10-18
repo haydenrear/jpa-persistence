@@ -7,5 +7,6 @@ import java.lang.annotation.*;
 @Documented
 public @interface LimitAccess {
 
+    String semaphoreName() default "default";
 
 }

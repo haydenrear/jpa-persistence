@@ -1,7 +1,9 @@
 package com.hayden.persistence.db_pressure;
 
 
+import com.hayden.utilitymodule.MapFunctions;
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -9,6 +11,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Phaser;
@@ -24,14 +27,22 @@ import java.util.concurrent.Semaphore;
 @Component
 public class LimitAccessAspect {
 
-    private final ConcurrentHashMap<String, Semaphore> semaphoreMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, Semaphore> semaphoreMap;
 
     @Autowired(required = false)
     DbDataSourceTrigger trigger;
     @Autowired(required = false)
     LimitAccessConfigProperties limitAccessConfigProperties = new  LimitAccessConfigProperties();
 
-    // 6:15
+    @PostConstruct
+    public void init() {
+        semaphoreMap = MapFunctions.CollectMap(limitAccessConfigProperties.semaphores
+                .entrySet()
+                .stream()
+                .map(s -> Map.entry(s.getKey(), new Semaphore(s.getValue().permits()))),
+                ConcurrentHashMap::new);
+    }
+
     public Semaphore retrieveSemaphore() {
         return semaphoreMap.compute(
                 Optional.ofNullable(trigger)
@@ -42,7 +53,8 @@ public class LimitAccessAspect {
     }
 
     @Around("@annotation(limited)")
-    public Object around(ProceedingJoinPoint joinPoint, LimitAccess limited) throws Throwable {
+    public Object around(ProceedingJoinPoint joinPoint,
+                         LimitAccess limited) throws Throwable {
         try {
             retrieveSemaphore().acquire();
             return joinPoint.proceed(joinPoint.getArgs());
