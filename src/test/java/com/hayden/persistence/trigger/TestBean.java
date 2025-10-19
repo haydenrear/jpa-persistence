@@ -64,6 +64,8 @@ public class TestBean {
         System.out.println("Saved TestEntity with ID: " + saved.getId() + " in datasource: " + curr);
 
         two.test();
+
+        assertThat(curr).isEqualTo("cdc-subscriber");
     }
 
 }
