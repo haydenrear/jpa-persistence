@@ -1,13 +1,24 @@
 services:
-  cdc-subscriber-test-pg:
+  cdc-subscriber-test-pg-first:
     image: localhost:5005/postgres-pgvector
-    container_name: cdc-subscriber-test-pg
+    container_name: cdc-subscriber-test-pg-one
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - cdc-subscriber-test:/var/lib/postgresql/embedding
+      - cdc-subscriber-test-one:/var/lib/postgresql/embedding
     ports:
       - "5489:5432"
+  cdc-subscriber-test-pg-second:
+    image: localhost:5005/postgres-pgvector
+    container_name: cdc-subscriber-test-pg-two
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - cdc-subscriber-test-two:/var/lib/postgresql/embedding
+    ports:
+      - "5499:5432"
 volumes:
-  cdc-subscriber-test:
+  cdc-subscriber-test-one:
+  cdc-subscriber-test-two:

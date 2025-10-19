@@ -3,18 +3,11 @@ package com.hayden.persistence.cdc;
 import com.google.common.collect.Lists;
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
 import com.hayden.utilitymodule.result.agg.AggregateParamError;
-import com.hayden.utilitymodule.stream.StreamUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.postgresql.PGConnection;
-import org.postgresql.PGNotification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -28,8 +21,6 @@ public class CdcProcessor {
     private CdcConnectionExecutor executor;
     @Autowired
     private DbDataSourceTrigger dbTrigger;
-
-
 
 
     // Map of subscription name to list of subscribers

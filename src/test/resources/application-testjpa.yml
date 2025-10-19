@@ -15,13 +15,51 @@ spring:
       password: postgres
       jdbc-url: jdbc:postgresql://localhost:5489/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
       url: jdbc:postgresql://localhost:5489/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
+    another:
+      driver-class-name: org.postgresql.Driver
+      username: postgres
+      password: postgres
+      jdbc-url: jdbc:postgresql://localhost:5489/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
+      url: jdbc:postgresql://localhost:5489/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
+    cdc-server:
+      driver-class-name: org.postgresql.Driver
+      username: postgres
+      password: postgres
+      jdbc-url: jdbc:postgresql://localhost:5499/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
+      url: jdbc:postgresql://localhost:5499/postgres?tcpKeepAlive=true&connectTimeout=10&socketTimeout=0
   jpa:
     hibernate:
       ddl-auto: create-drop
       format_sql: true
     show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
   liquibase:
     enabled: false
-  cloud:
+  endpoints:
     zookeeper:
       enabled: false
+
+otel:
+  instrumentation:
+    spring-web:
+      enabled: false
+    spring-webmvc:
+      enabled: false
+    spring-webflux:
+      enabled: false
+    jdbc:
+      enabled: false
+    kafka:
+      enabled: false
+    mongo:
+      enabled: false
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
