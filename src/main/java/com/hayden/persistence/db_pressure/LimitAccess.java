@@ -9,4 +9,8 @@ public @interface LimitAccess {
 
     String semaphoreName() default "default";
 
+    boolean isPhaser() default false;
+
+    boolean isWaiter() default false;
+
 }
