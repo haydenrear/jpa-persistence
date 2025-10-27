@@ -107,27 +107,21 @@ public class LimitAccessAspect {
 
         var limited = limitAccessOpt.get();
 
-
         PauseBarrier pauseBarrier = retrievePauseBarrier(limited.semaphoreName());
         boolean isPhaser = limited.isPhaser();
         boolean isWaiter = limited.isWaiter();
 
         // Handle phaser (short-lived, high-priority request)
         if (isPhaser) {
-
             var p = handlePhaser(joinPoint, limited, pauseBarrier);
-
             return p;
         }
 
         // Handle waiter (long-running operation)
         if (isWaiter) {
-
             var w = handleWaiter(joinPoint, limited, pauseBarrier);
-
             return w;
         }
-
 
         var d = handleDefault(joinPoint, limited);
 
@@ -172,11 +166,8 @@ public class LimitAccessAspect {
                                 PauseBarrier pauseBarrier) throws Throwable {
         ReentrantSemaphore reentrantSemaphore = retrieveSemaphore(limited);
         try {
-
             reentrantSemaphore.acquire();
-
             pauseBarrier.checkpointIfPaused();
-
             return joinPoint.proceed(joinPoint.getArgs());
         } catch (InterruptedException e) {
             logInterrupted(e);
@@ -199,17 +190,13 @@ public class LimitAccessAspect {
                                  LimitAccess limited) throws Throwable {
         ReentrantSemaphore reentrantSemaphore = retrieveSemaphore(limited);
         try {
-
             reentrantSemaphore.acquire();
-
             return joinPoint.proceed(joinPoint.getArgs());
         } catch (InterruptedException e) {
             log.error("Interrupted while waiting for Semaphore to acquire - could not acquire semaphore.");
             return joinPoint.proceed(joinPoint.getArgs());
         } finally {
-
             reentrantSemaphore.release();
-
         }
     }
 
