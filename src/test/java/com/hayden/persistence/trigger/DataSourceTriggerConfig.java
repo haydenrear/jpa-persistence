@@ -2,16 +2,18 @@ package com.hayden.persistence.trigger;
 
 import com.hayden.utilitymodule.db.DbDataSourceTrigger;
 import com.hayden.utilitymodule.db.WithDbAspect;
+import com.hayden.utilitymodule.otel.DisableOtelConfiguration;
 import lombok.SneakyThrows;
+import org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsExportAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingAutoConfiguration;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.*;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
-import org.springframework.orm.jpa.JpaTransactionManager;
-import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
-import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
@@ -25,7 +27,7 @@ import java.util.stream.Collectors;
 
 @Configuration
 @Profile("testjpa")
-@Import({DbDataSourceTrigger.class, WithDbAspect.class})
+@Import({DbDataSourceTrigger.class, WithDbAspect.class, DisableOtelConfiguration.class})
 @EnableJpaRepositories(basePackages = "com.hayden.persistence.trigger")
 public class DataSourceTriggerConfig {
 

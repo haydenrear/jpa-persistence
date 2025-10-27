@@ -44,6 +44,7 @@ spring:
     zookeeper:
       enabled: false
 
+
 otel:
   instrumentation:
     spring-web:
@@ -58,8 +59,22 @@ otel:
       enabled: false
     mongo:
       enabled: false
+  sdk:
+    disabled: true
+
 management:
   otlp:
     metrics:
       export:
         enabled: false
+    tracing:
+      export:
+        enabled: false
+    logging:
+      export:
+        enabled: false
+  tracing:
+    enabled: false
+  logging:
+    export:
+      enabled: false

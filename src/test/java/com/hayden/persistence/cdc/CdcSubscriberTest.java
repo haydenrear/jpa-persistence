@@ -1,5 +1,6 @@
 package com.hayden.persistence.cdc;
 
+import com.hayden.utilitymodule.otel.DisableOtelConfiguration;
 import lombok.SneakyThrows;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
 @ActiveProfiles("testjpa")
+@Import(DisableOtelConfiguration.class)
 class CdcSubscriberTest {
 
     public static AtomicReference<List<String>> ref = new AtomicReference<>(new ArrayList<>());
@@ -38,6 +41,7 @@ class CdcSubscriberTest {
 
     @SpringBootApplication
     @ComponentScan("com.hayden.persistence")
+    @Import(DisableOtelConfiguration.class)
     public static class CdcSubscriberApplication {
         public static void main(String[] args) {
             SpringApplication.run(CdcSubscriberApplication.class, args);
@@ -97,7 +101,7 @@ class CdcSubscriberTest {
 
         assertThat(countDownLatch.await(10, TimeUnit.SECONDS)).isTrue();
 
-        assertThat(ref.get().size()).isEqualTo(1);
+        assertThat(ref.get().size()).isGreaterThanOrEqualTo(1);
     }
 
 

@@ -2,6 +2,7 @@ plugins {
     id("com.hayden.jpa-persistence")
     id("com.hayden.no-main-class")
     id("com.hayden.docker-compose")
+    id("com.hayden.observable-app")
 }
 
 group = "com.hayden"

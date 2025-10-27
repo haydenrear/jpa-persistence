@@ -1,5 +1,6 @@
 package com.hayden.persistence.trigger;
 
+import com.hayden.utilitymodule.otel.DisableOtelConfiguration;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
@@ -9,10 +10,12 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -21,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
 @ActiveProfiles("testjpa")
+@Import(DisableOtelConfiguration.class)
 public class DataSourceTriggerTest {
 
 
@@ -33,8 +37,9 @@ public class DataSourceTriggerTest {
     private static final ExecutorService FIXED = Executors.newFixedThreadPool(5);
     private static final ExecutorService VIRTUAL = Executors.newVirtualThreadPerTaskExecutor();
 
-    @SpringBootApplication
+    @SpringBootApplication(   exclude = org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsExportAutoConfiguration.class)
     @ComponentScan("com.hayden.persistence")
+    @Import(DisableOtelConfiguration.class)
     public static class TestDbSourceApplication {
         static void main(String[] args) {
             SpringApplication.run(TestDbSourceApplication.class, args);
@@ -57,30 +62,42 @@ public class DataSourceTriggerTest {
     }
 
     private void withExecutor(ExecutorService virtual) {
+        AtomicInteger count = new AtomicInteger(0);
         var a = IntStream.range(0, 100)
                 .boxed()
-                .map(o -> CompletableFuture.runAsync(() -> {
-                    one.test();
-                }, virtual).exceptionally(handleException()))
+                .map(o -> {
+                    count.set(o);
+                    return CompletableFuture.runAsync(() -> {
+                        one.test();
+                    }, virtual).exceptionally(handleException());
+                })
                 .toArray(CompletableFuture[]::new);
 
-        countDownAfter(a);
+        countDownAfter(a, count);
     }
 
-    private static void countDownAfter(CompletableFuture[] a) {
+    private static void countDownAfter(CompletableFuture[] a, AtomicInteger count) {
         CompletableFuture.allOf(a)
-                        .thenAccept(c -> countDownLatch.countDown());
+                        .thenAccept(c -> {
+                            assertThat(count.get()).isEqualTo(99);
+                            countDownLatch.countDown();
+                        })
+                .exceptionally(handleException());
     }
 
     private void withoutExecutorService() {
+        AtomicInteger count = new AtomicInteger(0);
         var a = IntStream.range(0, 100)
                 .boxed()
-                .map(o -> CompletableFuture.runAsync(() -> {
-                    one.test();
+                .map(o -> {
+                    count.set(o);
+                    return CompletableFuture.runAsync(() -> {
+                                one.test();
+                            })
+                            .exceptionally(handleException());
                 })
-                        .exceptionally(handleException()))
                 .toArray(CompletableFuture[]::new);
-        countDownAfter(a);
+        countDownAfter(a, count);
     }
 
     private static @NotNull Function<Throwable, Void> handleException() {
