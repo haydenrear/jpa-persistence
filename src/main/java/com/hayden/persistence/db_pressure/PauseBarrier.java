@@ -9,7 +9,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public final class PauseBarrier {
 
+    // ---- Coordinator side ----
+    public record ResultOrExc<T>(T t, Throwable cause) {
+
+        public static <T> ResultOrExc<T> of(T t) {
+            return new ResultOrExc<>(t, null);
+        }
+
+        public static <T> ResultOrExc<T> err(Throwable th) {
+            return new ResultOrExc<>(null, th);
+        }
+
+        public boolean isErr() {
+            return cause != null;
+        }
+    }
+
+    @FunctionalInterface
+    public interface WaiterExecution<T> {
+        ResultOrExc<T> run();
+    }
+
     private final Phaser phaser = new Phaser(0);
+
     private volatile boolean pauseRequested = false;
 
     // global: counts overlapping phasers; first does handshake, last releases
@@ -35,27 +57,6 @@ public final class PauseBarrier {
         } finally {
             phaser.arriveAndDeregister();
         }
-    }
-
-    // ---- Coordinator side ----
-    public record ResultOrExc<T>(T t, Throwable cause) {
-
-        public static <T> ResultOrExc<T> of(T t) {
-            return new ResultOrExc<>(t, null);
-        }
-
-        public static <T> ResultOrExc<T> err(Throwable th) {
-            return new ResultOrExc<>(null, th);
-        }
-
-        public boolean isErr() {
-            return cause != null;
-        }
-    }
-
-    @FunctionalInterface
-    public interface WaiterExecution<T> {
-        ResultOrExc<T> run();
     }
 
     public <T> ResultOrExc<T> pauseWaitersAndRun(WaiterExecution<T> critical) {
@@ -94,13 +95,20 @@ public final class PauseBarrier {
         } finally {
             // Decrement depth and clear pause flag only when last phaser exits
             int remaining = pauseDepth.decrementAndGet();
-            if (remaining == 0) pauseRequested = false;
 
-            if (coordParty) phaser.arriveAndDeregister();
-            else phaser.arrive();
+            if (remaining == 0)
+                pauseRequested = false;
+
+            if (coordParty)
+                phaser.arriveAndDeregister();
+            else
+                phaser.arrive();
 
             int d = coordinatorDepthLocal.get() - 1;
-            if (d == 0) coordinatorDepthLocal.remove(); else coordinatorDepthLocal.set(d);
+            if (d == 0)
+                coordinatorDepthLocal.remove();
+            else
+                coordinatorDepthLocal.set(d);
         }
     }
 }
