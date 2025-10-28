@@ -141,7 +141,7 @@ public class LimitAccessAspect {
                 try {
                     return PauseBarrier.ResultOrExc.of(joinPoint.proceed(joinPoint.getArgs()));
                 } catch (Throwable e) {
-                    return PauseBarrier.ResultOrExc.of(e);
+                    return PauseBarrier.ResultOrExc.err(e);
                 }
             });
 
