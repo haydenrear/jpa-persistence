@@ -43,7 +43,7 @@ public final class PauseBarrier {
     // ---- Waiter side ----
     public void checkpointIfPaused() {
         if (!pauseRequested) return;
-        if (coordinatorDepthLocal.get() > 0) return; // don’t block the coordinator thread
+        if (coordinatorDepthLocal.get() > 0) return;
         if (TransactionSynchronizationManager.isActualTransactionActive()) return;
 
         // Two-phase handshake: acknowledge, then wait for release

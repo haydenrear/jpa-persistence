@@ -151,7 +151,7 @@ public class LimitAccessAspect {
                 return p.t();
             }
         } catch (InterruptedException e) {
-            logInterrupted(e);
+            doInterrupt();
             return joinPoint.proceed(joinPoint.getArgs());
         } finally {
             reentrantSemaphore.release();
@@ -170,7 +170,7 @@ public class LimitAccessAspect {
             pauseBarrier.checkpointIfPaused();
             return joinPoint.proceed(joinPoint.getArgs());
         } catch (InterruptedException e) {
-            logInterrupted(e);
+            doInterrupt();
             return joinPoint.proceed(joinPoint.getArgs());
         } finally {
 
@@ -193,11 +193,16 @@ public class LimitAccessAspect {
             reentrantSemaphore.acquire();
             return joinPoint.proceed(joinPoint.getArgs());
         } catch (InterruptedException e) {
-            log.error("Interrupted while waiting for Semaphore to acquire - could not acquire semaphore.");
+            doInterrupt();
             return joinPoint.proceed(joinPoint.getArgs());
         } finally {
             reentrantSemaphore.release();
         }
+    }
+
+    private static void doInterrupt() {
+        log.error("Interrupted while waiting for Semaphore to acquire - could not acquire semaphore.");
+        Thread.currentThread().interrupt();
     }
 
     public ReentrantSemaphore retrieveSemaphore(LimitAccess limitAccess) {
