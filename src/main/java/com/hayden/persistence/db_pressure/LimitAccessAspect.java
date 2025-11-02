@@ -99,6 +99,9 @@ public class LimitAccessAspect {
 
     @Around("withLimitAccess()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (!this.limitAccessConfigProperties.enable)
+            return joinPoint.proceed(joinPoint.getArgs());
+
         Optional<LimitAccess> limitAccessOpt = resolveAnnotationForMethod(joinPoint, LimitAccess.class);
 
         if (limitAccessOpt.isEmpty()) {

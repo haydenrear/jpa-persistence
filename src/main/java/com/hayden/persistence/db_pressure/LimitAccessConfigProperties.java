@@ -20,4 +20,6 @@ public class LimitAccessConfigProperties {
 
     int maxAccess = 170;
 
+    boolean enable;
+
 }
