@@ -13,4 +13,6 @@ public @interface LimitAccess {
 
     boolean isWaiter() default false;
 
+    boolean skipIfNotAvailable() default false;
+
 }
