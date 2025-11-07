@@ -44,12 +44,16 @@ public final class PauseBarrier {
     public void checkpointIfPaused() {
         if (!pauseRequested) return;
         if (coordinatorDepthLocal.get() > 0) return;
-        if (TransactionSynchronizationManager.isActualTransactionActive()) return;
+        if (TransactionSynchronizationManager.isSynchronizationActive()) return;
 
         // Two-phase handshake: acknowledge, then wait for release
         phaser.register();
         try {
             int phase = phaser.getPhase();
+
+            if (pauseDepth.get() <= 0) {
+                return;
+            }
             // 1) Acknowledge pause (let coordinator know we're parked at the gate)
             phaser.arriveAndAwaitAdvance();
             // 2) Stay parked until coordinator releases
@@ -63,27 +67,31 @@ public final class PauseBarrier {
         boolean coordParty = false;
         try {
             // mark this thread as coordinator for re-entrant waiter calls
+            var starting = coordinatorDepthLocal.get();
             coordinatorDepthLocal.set(coordinatorDepthLocal.get() + 1);
 
             // coordinator participates as a party
             phaser.register();
-            coordParty = true;
 
-            int before = pauseDepth.getAndIncrement();
-            if (before == 0) {
-                // First/outermost phaser: publish pause and do the 2-phase handshake
+            if (pauseDepth.getAndIncrement() == 0)
                 pauseRequested = true;
+
+            if (starting == 0) {
+                coordParty = true;
+                // First/outermost phaser: publish pause and do the 2-phase handshake
 
                 // Phase A: wait for all waiters to ACK they’re paused (first gate)
                 phaser.arriveAndAwaitAdvance();
 
-                // ---- critical section runs while waiters are parked at the second gate ----
-                ResultOrExc<T> res = critical.run();
+                try {
+                    // ---- critical section runs while waiters are parked at the second gate ----
+                    ResultOrExc<T> res = critical.run();
+                    return res;
+                } finally {
+                    // Phase B: release waiters (second gate)
+                    phaser.arriveAndAwaitAdvance();
+                }
 
-                // Phase B: release waiters (second gate)
-                phaser.arriveAndAwaitAdvance();
-
-                return res;
             } else {
                 // Already paused: no handshake; just arrive this phase
                 phaser.arrive(); // arrive at whatever gate we're at so we don't block others

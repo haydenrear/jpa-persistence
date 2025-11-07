@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -45,9 +46,7 @@ public class LimitAccessAspectTest {
     @Autowired
     private Frames frames;
 
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(120);
-
-
+    private static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
     @SpringBootApplication(exclude = org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsExportAutoConfiguration.class)
     @ComponentScan("com.hayden.persistence")
@@ -304,10 +303,10 @@ public class LimitAccessAspectTest {
         final long seed = System.nanoTime();
         final Random r = new Random(seed);
 
-        final int scenarios = 6 + r.nextInt(6);  // 6..11 trees this run
-        final int maxDepth  = 4 + r.nextInt(3);  // 4..6
-        final int fanoutMax = 3;                 // up to ternary tree
-        final long perTreeTimeoutMs = 120_000;
+        final int scenarios = 120;  // 6..11 trees this run
+        final int maxDepth  = 22;   // 4..6
+        final int fanoutMax = 3;    // up to ternary tree
+        final long perTreeTimeoutMs = 25000;
 
         List<CompletableFuture<Void>> runs = new ArrayList<>(scenarios);
 
@@ -322,7 +321,7 @@ public class LimitAccessAspectTest {
                 } catch (TimeoutException te) {
                     throw new RuntimeException("Tree timed out (possible deadlock)", te);
                 } catch (Exception e) {
-                    throw new RuntimeException(e);
+                    log.error("Error", e);
                 }
             }, EXECUTOR));
             // slight jitter between submissions to vary overlaps
@@ -381,24 +380,27 @@ public class LimitAccessAspectTest {
         @LimitAccess(semaphoreName = "indexing", isWaiter = true)
         public void waiterFrame(Runnable body) {
             // simulate work before nested calls
-            sleep(10, 40);
+            sleep(1, 4);
             if (body != null) body.run();        // <-- nested calls happen here
-            sleep(10, 40);
+            sleep(1, 4);
         }
 
         @LimitAccess(semaphoreName = "indexing", isWaiter = true)
-        @Transactional
+//        @Transactional(readOnly=true)
         public void waiterTxFrame(Runnable body) {
-            sleep(20, 60);
+            sleep(2, 6);
+            if (new Random().nextInt() % 2 == 0)  {
+                throw new RuntimeException("Failed!!!");
+            }
             if (body != null) body.run();
-            sleep(20, 60);
+            sleep(2, 6);
         }
 
         @LimitAccess(semaphoreName = "indexing", isPhaser = true)
         public void phaserFrame(Runnable body) {
-            sleep(10, 40);
+            sleep(1, 4);
             if (body != null) body.run();
-            sleep(10, 40);
+            sleep(1, 4);
         }
 
         private static void sleep(int lo, int hi) {
@@ -516,12 +518,12 @@ public class LimitAccessAspectTest {
     @Slf4j
     public static class IndexingWaiterWithTransactionExecutor {
         /**
-         * Indexing phase with @LimitAccess(isWaiter=true) and @Transactional.
+         * Indexing phase with @LimitAccess(isWaiter=true) and @Transactional(readOnly=true).
          * This is in a separate bean so the aspect can intercept it.
          * With an active transaction, it won't yield even if phasers arrive.
          */
         @LimitAccess(semaphoreName = "indexing", isWaiter = true)
-        @Transactional
+        @Transactional(readOnly=true)
         public void executeIndexingPhaseWithTransaction() throws InterruptedException {
             // Simulate longer indexing work within transaction
             Thread.sleep(100);
@@ -540,7 +542,7 @@ public class LimitAccessAspectTest {
          * This will pause all waiters while executing the critical section.
          */
         @LimitAccess(semaphoreName = "indexing", isPhaser = true)
-        @Transactional
+        @Transactional(readOnly=true)
         public void processRequest(int requestNum) {
             try {
                 log.info("Phaser request {} executing in critical section (waiter paused)", requestNum);
@@ -573,7 +575,7 @@ public class LimitAccessAspectTest {
          * This tests the scenario where a phaser calls a waiter.
          */
         @LimitAccess(semaphoreName = "indexing", isPhaser = true)
-        @Transactional
+        @Transactional(readOnly=true)
         public void processRequestThatCallsWaiter() {
             try {
                 log.info("Phaser request calling waiter method");
