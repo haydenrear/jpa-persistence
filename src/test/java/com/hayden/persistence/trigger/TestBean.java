@@ -51,13 +51,13 @@ public class TestBean {
     }
 
     @WithDb("cdc-subscriber")
-    @Transactional
+//    @Transactional
     public void test() {
         var curr = trigger.currentKey();
 
         // Create and save a test entity
         TestEntity entity = new TestEntity("TestName", "Test Description");
-        TestEntity saved = testEntityRepository.save(entity);
+        TestEntity saved = testEntityRepository.saveAndFlush(entity);
 
         assertThat(curr).isEqualTo("cdc-subscriber");
 

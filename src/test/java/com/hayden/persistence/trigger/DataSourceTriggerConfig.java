@@ -54,10 +54,10 @@ public class DataSourceTriggerConfig {
         return DataSourceBuilder.create().build();
     }
 
-    @Bean(name = {"txManager", "transactionManager"})
-    public PlatformTransactionManager txManager(DbDataSourceTrigger dbDataSourceTrigger) {
-        return new DataSourceTransactionManager(abstractRoutingDataSource(dbDataSourceTrigger)); // IMPORTANT: routing DS here
-    }
+//    @Bean(name = {"txManager", "transactionManager"})
+//    public PlatformTransactionManager txManager(DbDataSourceTrigger dbDataSourceTrigger) {
+//        return new DataSourceTransactionManager(abstractRoutingDataSource(dbDataSourceTrigger)); // IMPORTANT: routing DS here
+//    }
 
     @Bean
     @Primary

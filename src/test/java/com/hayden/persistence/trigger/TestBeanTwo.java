@@ -20,7 +20,7 @@ public class TestBeanTwo {
     private TestEntityTwoRepository testEntityTwoRepository;
 
     @WithDb("cdc-server")
-    @Transactional
+//    @Transactional
     public void test() {
         var curr = trigger.currentKey();
 
@@ -28,7 +28,7 @@ public class TestBeanTwo {
 
         // Create and save a test entity
         TestEntityTwo entity = new TestEntityTwo("TestValue", 42);
-        TestEntityTwo saved = testEntityTwoRepository.save(entity);
+        TestEntityTwo saved = testEntityTwoRepository.saveAndFlush(entity);
 
 
         System.out.println("Saved TestEntityTwo with ID: " + saved.getId() + " in datasource: " + curr);
